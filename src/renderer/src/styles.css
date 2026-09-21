@@ -1,0 +1,912 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  background: transparent;
+}
+
+body {
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
+  color: #f2f2f4;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  /* Chromium buttons don't inherit color from the page by default (they get
+     a UA system color instead) — without this, any text inside a <button>
+     that doesn't set its own color falls back to that dark system default,
+     invisible on a dark panel. */
+  color: inherit;
+}
+
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--blue-text);
+  outline-offset: 2px;
+}
+
+:root {
+  --bg-card: #1b1b1e;
+  --bg-card-2: #202024;
+  --border: rgba(255, 255, 255, 0.08);
+  --text-primary: #f2f2f4;
+  --text-secondary: #96969c;
+  --green: #4ade80;
+  --green-bg: rgba(74, 222, 128, 0.14);
+  --amber: #f5a623;
+  --amber-bg: rgba(245, 166, 35, 0.14);
+  --blue-fill: #2f5bff;
+  --blue-bg: #16204a;
+  --blue-text: #8fb2ff;
+  --purple: #b98bf5;
+  --purple-bg: rgba(185, 139, 245, 0.14);
+  --ease: cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.24);
+}
+
+.app-shell {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  /* No -webkit-app-region: drag here on purpose — the window is
+     movable: false in main/index.ts, so a drag region can never actually
+     move it. It was pure dead weight, and Chromium's drag-region hit-testing
+     fights with wheel/trackpad scroll gestures over the area it covers,
+     which is what made scrolling inside .tool-list and .waste-list feel
+     janky rather than smooth. */
+}
+
+/* While the native window is animating between the handle and panel widths,
+   our CSS layout keeps reflowing to match each in-between width, which can
+   flash an OS/webkit scrollbar on the scrollable regions for a frame or two.
+   App.tsx toggles this class for the animation's duration only. */
+.app-shell.is-resizing .panel-body,
+.app-shell.is-resizing .tool-list,
+.app-shell.is-resizing .snippet {
+  overflow: hidden !important;
+}
+
+/* ---- handle (idle) ---- */
+
+@keyframes handleIn {
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes idleGlow {
+  0%,
+  100% {
+    border-color: rgba(245, 166, 35, 0.2);
+  }
+  50% {
+    border-color: rgba(245, 166, 35, 0.55);
+  }
+}
+
+.handle {
+  width: 52px;
+  height: 96px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-right: none;
+  border-radius: 20px 0 0 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition:
+    transform 0.2s var(--ease),
+    background 0.2s var(--ease);
+  animation: handleIn 0.25s var(--ease);
+}
+
+.handle:hover {
+  transform: translateX(-5px);
+  background: #202023;
+}
+
+.handle:active {
+  transform: translateX(-2px) scale(0.98);
+}
+
+.handle.has-idle {
+  animation:
+    handleIn 0.25s var(--ease),
+    idleGlow 2.6s ease-in-out 0.3s infinite;
+}
+
+.handle-icon {
+  width: 20px;
+  height: 16px;
+  border: 1.5px solid var(--text-secondary);
+  border-radius: 3px;
+  position: relative;
+  transition: border-color 0.2s var(--ease);
+}
+
+.handle-icon::after {
+  content: '';
+  position: absolute;
+  left: 40%;
+  top: -1.5px;
+  bottom: -1.5px;
+  width: 0;
+  border-left: 1.5px solid var(--text-secondary);
+}
+
+.handle-dot {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--amber);
+  border: 1.5px solid var(--bg-card);
+}
+
+.handle.has-idle .handle-icon,
+.handle.has-idle .handle-icon::after {
+  border-color: #d9d9de;
+}
+
+.handle-badge {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  letter-spacing: 0.03em;
+}
+
+.handle.has-idle .handle-badge {
+  color: var(--amber);
+}
+
+/* ---- panel (open states) ---- */
+
+@keyframes panelIn {
+  from {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes viewFade {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.panel {
+  width: 440px;
+  height: 640px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow: hidden;
+  animation: panelIn 0.2s var(--ease);
+}
+
+.panel-body {
+  flex: 1;
+  /* Flex items default to min-height: auto, which stops them shrinking
+     below their content's natural height — without this the body just
+     grows to fit everything instead of staying constrained and scrolling
+     (same class of bug as .tool-list / .snippet). */
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: -4px -8px -4px 0;
+  padding: 4px 8px 4px 0;
+}
+
+.panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.panel-header h1 {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0 0 4px;
+  letter-spacing: -0.01em;
+}
+
+.panel-sub {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.icon-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  transition:
+    background 0.15s var(--ease),
+    color 0.15s var(--ease),
+    transform 0.15s var(--ease);
+}
+
+.icon-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+}
+
+.icon-btn:active:not(:disabled) {
+  transform: scale(0.92);
+}
+
+.icon-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.icon-btn.spinning svg {
+  animation: spin 0.9s linear infinite;
+}
+
+.back-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.close-btn:hover:not(:disabled) {
+  background: rgba(255, 90, 90, 0.14);
+  color: #ff8080;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.stat-tile {
+  background: var(--bg-card-2);
+  border-radius: 12px;
+  padding: 12px 14px;
+  border-left: 2px solid transparent;
+  transition: border-color 0.2s var(--ease);
+}
+
+.stat-tile.warn {
+  background: rgba(245, 166, 35, 0.12);
+  border-left-color: var(--amber);
+}
+
+.stat-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin: 0 0 6px;
+}
+
+.stat-tile.warn .stat-label {
+  color: #e8b158;
+}
+
+.stat-value {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-tile.warn .stat-value {
+  color: var(--amber);
+}
+
+.section-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 4px 0 -4px;
+}
+
+.findings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.finding-row {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.finding-summary {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: transparent;
+  border: none;
+  padding: 8px 6px;
+  margin: 0 -6px;
+  text-align: left;
+  border-radius: 8px;
+  transition: background 0.15s var(--ease);
+}
+
+.finding-summary:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.finding-dot {
+  width: 7px;
+  height: 7px;
+  min-width: 7px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+}
+
+.status-warn .finding-dot {
+  background: var(--amber);
+}
+
+.status-info .finding-dot {
+  background: var(--blue-text);
+}
+
+.status-ok .finding-dot {
+  background: var(--green);
+}
+
+.finding-label {
+  flex: 1;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.finding-impact {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.status-warn .finding-impact {
+  color: var(--amber);
+}
+
+.finding-chevron {
+  display: flex;
+  color: var(--text-secondary);
+  transform: rotate(-90deg);
+  transition: transform 0.15s var(--ease);
+}
+
+.finding-chevron.expanded {
+  transform: rotate(90deg);
+}
+
+.finding-chevron svg {
+  width: 13px;
+  height: 13px;
+}
+
+.finding-detail {
+  padding: 2px 6px 10px;
+  animation: viewFade 0.15s var(--ease);
+}
+
+.finding-detail .panel-sub {
+  margin-bottom: 6px;
+}
+
+.finding-fix {
+  margin: 0;
+  padding-left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.finding-fix li {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.waste-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.waste-row {
+  display: grid;
+  grid-template-columns: minmax(70px, 34%) 1fr 60px;
+  align-items: center;
+  gap: 10px;
+  background: transparent;
+  border: none;
+  padding: 8px 6px;
+  margin: 0 -6px;
+  text-align: left;
+  border-radius: 8px;
+  transition: background 0.15s var(--ease);
+}
+
+.waste-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.waste-row:hover .waste-name {
+  color: #fff;
+}
+
+.waste-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 0.15s var(--ease);
+}
+
+.source-tag {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 6px;
+  border-radius: 999px;
+  margin-left: 6px;
+  vertical-align: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-secondary);
+}
+
+.source-tag.plugin {
+  background: var(--blue-bg);
+  color: var(--blue-text);
+}
+
+.source-tag.connector {
+  background: var(--purple-bg);
+  color: var(--purple);
+}
+
+.source-tag.unknown {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-secondary);
+}
+
+.waste-track {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.waste-fill {
+  height: 100%;
+  background: var(--green);
+  border-radius: 3px;
+  transition: width 0.4s var(--ease);
+}
+
+.waste-fraction {
+  font-size: 12px;
+  color: var(--amber);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.primary-btn {
+  background: var(--blue-fill);
+  border: none;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 12px 16px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition:
+    filter 0.15s var(--ease),
+    transform 0.1s var(--ease),
+    opacity 0.15s var(--ease);
+}
+
+.primary-btn:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.primary-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.primary-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.primary-btn.secondary {
+  background: var(--blue-bg);
+  color: var(--blue-text);
+}
+
+.outline-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 12px 16px;
+  border-radius: 10px;
+  transition:
+    background 0.15s var(--ease),
+    transform 0.1s var(--ease),
+    opacity 0.15s var(--ease);
+}
+
+.outline-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.outline-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.outline-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.link-btn {
+  background: transparent;
+  border: none;
+  color: #6fa0ff;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 0;
+  transition: color 0.15s var(--ease);
+}
+
+.link-btn:hover {
+  color: #a0c2ff;
+}
+
+.note-box {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.note-box p {
+  margin: 0;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 6px;
+  padding: 28px 12px;
+  color: var(--text-secondary);
+  flex: 1;
+}
+
+.empty-state .empty-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+
+.tool-list {
+  flex: 1;
+  /* Flex items default to min-height: auto, which stops them shrinking
+     below their content's natural height — without this, the list just
+     grows to fit every row instead of staying constrained and scrolling,
+     and the extra rows get silently clipped by .panel's overflow: hidden
+     instead of becoming reachable. */
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: -2px -8px;
+  padding: 2px 8px;
+}
+
+.tool-row {
+  display: grid;
+  grid-template-columns: 20px 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 4px;
+  border-radius: 8px;
+  transition: background 0.15s var(--ease);
+}
+
+.tool-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.tool-row input[type='checkbox'] {
+  accent-color: var(--blue-fill);
+  width: 15px;
+  height: 15px;
+}
+
+.tool-row input[type='checkbox']:disabled {
+  opacity: 0.25;
+}
+
+.tool-name {
+  font-size: 14px;
+}
+
+.tool-calls {
+  font-size: 12px;
+  color: var(--text-secondary);
+  min-width: 18px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+
+.badge.used {
+  background: var(--green-bg);
+  color: var(--green);
+}
+
+.badge.idle {
+  background: var(--amber-bg);
+  color: var(--amber);
+}
+
+.footer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.footer-row .primary-btn,
+.footer-row .outline-btn {
+  flex: 1;
+}
+
+.selected-count {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.chip-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-card-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 5px 6px 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  animation: viewFade 0.15s var(--ease);
+}
+
+.chip-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1;
+  padding: 0;
+  transition:
+    background 0.15s var(--ease),
+    color 0.15s var(--ease);
+}
+
+.chip-remove:hover {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
+.savings-card {
+  background: rgba(74, 222, 128, 0.1);
+  border: 1px solid rgba(74, 222, 128, 0.25);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+.savings-label {
+  font-size: 12px;
+  color: var(--green);
+  margin: 0 0 4px;
+  font-weight: 600;
+}
+
+.savings-value {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--green);
+  margin: 0 0 2px;
+}
+
+.savings-sub {
+  font-size: 12px;
+  color: #9adfb3;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.savings-sub code {
+  background: rgba(0, 0, 0, 0.2);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.snippet {
+  background: #101012;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-family: 'SF Mono', ui-monospace, Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #c9c9cf;
+  overflow-y: auto;
+  overflow-x: auto;
+  flex: 1;
+  min-height: 0;
+  white-space: pre;
+}
+
+.snippet .key {
+  color: #7fb0ff;
+}
+
+.snippet .str {
+  color: #9adfb3;
+}
+
+.button-row {
+  display: flex;
+  gap: 10px;
+}
+
+.button-row > * {
+  flex: 1;
+}
+
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.toast {
+  position: absolute;
+  bottom: 78px;
+  left: 20px;
+  right: 20px;
+  background: #101012;
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  font-size: 12px;
+  text-align: center;
+  padding: 8px 10px;
+  border-radius: 8px;
+  animation: toastIn 0.18s var(--ease);
+}
