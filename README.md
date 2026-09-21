@@ -22,6 +22,12 @@ npm install
 npm run dev
 ```
 
+Running from a VS Code or Cursor terminal is fine: those editors export
+`ELECTRON_RUN_AS_NODE=1`, which makes Electron start as plain Node and crash
+with a stack trace, so `npm run dev` and `npm run preview` clear it for you
+(`env -u ELECTRON_RUN_AS_NODE`). If you launch Electron some other way, unset
+it yourself.
+
 Click the handle to expand. Click a server's usage bar to drill into its
 called tools; "Add to kill list" flags the whole server; the kill-list view
 generates a `disabledMcpjsonServers` snippet per affected project, copyable
