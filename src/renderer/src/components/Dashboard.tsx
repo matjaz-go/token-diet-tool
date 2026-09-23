@@ -7,19 +7,11 @@ interface Props {
   scan: ScanResult | null
   loading: boolean
   onSelectServer: (id: string) => void
-  onViewKillList: () => void
   onRefresh: () => void
   onClose: () => void
 }
 
-export default function Dashboard({
-  scan,
-  loading,
-  onSelectServer,
-  onViewKillList,
-  onRefresh,
-  onClose
-}: Props) {
+export default function Dashboard({ scan, loading, onSelectServer, onRefresh, onClose }: Props) {
   const idleCount = scan ? scan.servers.filter((s) => s.idle).length : 0
   const toolsCalled = scan ? scan.servers.reduce((sum, s) => sum + s.tools.length, 0) : 0
   const maxCalls = scan ? Math.max(1, ...scan.servers.map((s) => s.totalCalls)) : 1
@@ -151,9 +143,24 @@ export default function Dashboard({
         </div>
       )}
 
-      <button className="primary-btn secondary" onClick={onViewKillList} disabled={!scan}>
-        View kill list
-      </button>
+      {scan && !scan.error && scan.potentialReduction?.avgPerSessionTokens ? (
+        <div className="connect-card">
+          <p className="connect-text">
+            ~{formatTokens(scan.potentialReduction.avgPerSessionTokens)} wasted tokens per session.
+            Is that normal for a team your size?{' '}
+            <button
+              className="link-btn connect-inline"
+              onClick={() => window.toolDietBridge?.openConnect()}
+            >
+              Connect to find out.
+            </button>
+          </p>
+          <p className="connect-note">
+            Computed entirely from your own local data. &ldquo;Connect&rdquo; only opens a GitHub
+            Discussion in your browser &mdash; nothing is sent automatically.
+          </p>
+        </div>
+      ) : null}
     </div>
   )
 }

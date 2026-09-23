@@ -4,32 +4,21 @@ import { ChevronLeft, CloseIcon } from './icons'
 interface Props {
   server: RealServer
   sinceDays: number
-  inKillList: boolean
-  onToggle: () => void
   onBack: () => void
-  onViewKillList: () => void
   onClose: () => void
 }
 
 const SOURCE_NOTE: Record<RealServer['source'], string | null> = {
   project: null,
   plugin:
-    'Installed via Claude Code’s plugin system, not project config. Manage installed plugins with the /plugin command — this app doesn’t generate a removal snippet for these yet.',
+    'Installed via Claude Code’s plugin system, not project config. Manage installed plugins with the /plugin command.',
   connector:
     'A claude.ai account connector, not local config. This only knows it was connected at some point — not whether it still is. Manage it at claude.ai → Settings → Connectors.',
   unknown:
     'Tool calls with this prefix were found in your session logs, but it doesn’t match any known config, plugin, or connector source.'
 }
 
-export default function Drilldown({
-  server,
-  sinceDays,
-  inKillList,
-  onToggle,
-  onBack,
-  onViewKillList,
-  onClose
-}: Props) {
+export default function Drilldown({ server, sinceDays, onBack, onClose }: Props) {
   const note = SOURCE_NOTE[server.source]
 
   return (
@@ -56,11 +45,6 @@ export default function Drilldown({
           </div>
         </div>
         <div className="header-actions">
-          {inKillList && (
-            <button className="link-btn" onClick={onViewKillList}>
-              view kill list
-            </button>
-          )}
           <button className="icon-btn close-btn" onClick={onClose} aria-label="Close drawer">
             <CloseIcon />
           </button>
@@ -97,24 +81,7 @@ export default function Drilldown({
         <p className="panel-sub">
           No tool calls recorded for this server in the window. Tool-diet can&apos;t see the full list of
           tools it exposes without connecting to it &mdash; but zero calls this window is a real signal
-          it&apos;s a candidate to disable.
-        </p>
-      )}
-
-      <div className="spacer" />
-
-      {server.killListEligible ? (
-        <div className="footer-row">
-          <span className="selected-count">
-            {inKillList ? 'flagged for the kill list' : 'not flagged'}
-          </span>
-          <button className={inKillList ? 'outline-btn' : 'primary-btn'} onClick={onToggle}>
-            {inKillList ? 'Remove from kill list' : 'Add to kill list'}
-          </button>
-        </div>
-      ) : (
-        <p className="panel-sub" style={{ borderTop: '1px solid var(--border)', paddingTop: 10 }}>
-          Not kill-list eligible &mdash; no local config lever exists to disable this one.
+          it&apos;s idle.
         </p>
       )}
     </div>

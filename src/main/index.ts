@@ -1,6 +1,6 @@
-import { app, BrowserWindow, ipcMain, Menu, screen, clipboard } from 'electron'
+import { app, BrowserWindow, ipcMain, Menu, screen, shell } from 'electron'
 import { join } from 'node:path'
-import { runScan, buildDisabledServersSnippet } from './realScan'
+import { runScan } from './realScan'
 
 // .handle itself is 52px wide; the extra 12px here is deliberate slack so
 // .handle:hover's translateX(-5px) has room to slide left without clipping
@@ -64,16 +64,21 @@ ipcMain.handle('window:set-expanded', (_event, expanded: boolean) => {
   win.setBounds(boundsFor(expanded ? PANEL_WIDTH : HANDLE_WIDTH), true)
 })
 
-ipcMain.handle('clipboard:write', (_event, text: string) => {
-  clipboard.writeText(text)
-})
-
 ipcMain.handle('scan:run', (_event, sinceDays: number) => {
   return runScan(sinceDays)
 })
 
-ipcMain.handle('scan:snippet', (_event, flaggedServerIds: string[]) => {
-  return buildDisabledServersSnippet(flaggedServerIds)
+// The one place this app ever touches the network, and even this doesn't:
+// it opens a fixed GitHub Discussion URL in the user's real browser via the
+// OS, never fetches anything itself and never sends any local scan data.
+// Deliberately a no-argument handler (not a generic "open any URL" bridge)
+// so the renderer can't be made to open something else later without a
+// review of this file.
+const CONNECT_DISCUSSION_URL =
+  'https://github.com/matjaz-go/token-diet-tool/discussions/new?category=ideas'
+
+ipcMain.handle('connect:open', () => {
+  return shell.openExternal(CONNECT_DISCUSSION_URL)
 })
 
 // Quitting the app (as opposed to closing the drawer, which is just

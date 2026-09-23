@@ -391,7 +391,11 @@ export function checkMcpCliRedundancy(projectServerNames: string[]): Finding | n
 // real impactTokens of their own. Ported from tool-diet's recommend.js.
 const REDUCTION_IDS = new Set<FindingId>(['repeated-reads', 'claude-md-bloat', 'cost-breakdown'])
 
-export function computePotentialReduction(findings: Finding[], windowTotalTokens: number): PotentialReduction | null {
+export function computePotentialReduction(
+  findings: Finding[],
+  windowTotalTokens: number,
+  sessionsThisWindow: number
+): PotentialReduction | null {
   let total = 0
   const contributors: FindingId[] = []
   for (const f of findings) {
@@ -402,5 +406,6 @@ export function computePotentialReduction(findings: Finding[], windowTotalTokens
   }
   if (total <= 0 || !windowTotalTokens) return null
   const pct = Math.round((total / windowTotalTokens) * 100)
-  return { totalTokens: total, pct, contributors }
+  const avgPerSessionTokens = sessionsThisWindow > 0 ? Math.round(total / sessionsThisWindow) : undefined
+  return { totalTokens: total, pct, contributors, avgPerSessionTokens }
 }

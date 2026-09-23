@@ -6,12 +6,9 @@ declare global {
   interface Window {
     toolDietBridge?: {
       setExpanded: (expanded: boolean) => Promise<void>
-      copyToClipboard: (text: string) => Promise<void>
       runScan: (sinceDays: number) => Promise<ScanResult>
-      buildSnippet: (
-        flaggedServerIds: string[]
-      ) => Promise<Record<string, { disabledMcpjsonServers: string[] }>>
       showContextMenu: () => Promise<void>
+      openConnect: () => Promise<void>
     }
   }
 }

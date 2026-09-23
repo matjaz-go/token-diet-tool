@@ -5,13 +5,19 @@ setup: which MCP servers you configured but never call, what you actually
 spent, how healthy your prompt cache is, and where context is being wasted.
 
 A thin handle docks to the right edge of your screen showing "N idle". Click
-it to open a dashboard, drill into a server's real called tools, and generate
-a config snippet for the servers you want to turn off.
+it to open a dashboard and drill into a server to see its real called tools.
 
 <p align="center"><img src="docs/screenshot.png" alt="Tool Diet Audit dashboard" width="380"></p>
 
 Everything is computed **locally and read-only** from files Claude Code
 already writes on your machine. See [Privacy](#privacy).
+
+One line goes further than "here's your data": it names a real, computed
+number — the average wasted tokens per session, from the same reducible pool
+as the "Potential this week" banner — and asks whether that's normal for a
+team your size. There's no comparison data behind that yet, so today
+"Connect to find out" just opens a GitHub Discussion in your browser to
+register interest; see [Connect (optional)](#connect-optional).
 
 ## Run it
 
@@ -29,11 +35,7 @@ with a stack trace, so `npm run dev` and `npm run preview` clear it for you
 it yourself.
 
 Click the handle to expand. Click a server's usage bar to drill into its
-called tools; "Add to kill list" flags the whole server; the kill-list view
-generates a `disabledMcpjsonServers` snippet per affected project, copyable
-via "Copy snippet". "Re-scan after restart" clears flags, re-runs the scan and
-collapses back to the handle — use it after you've pasted the snippet into
-`~/.claude.json` and restarted Claude Code. Right-click the drawer to quit.
+called tools. Right-click the drawer to quit.
 
 `npm run dist:mac` packages an **unsigned, unnotarized** arm64 `.app` (zipped)
 into `release/`; `npm run dist:mac:intel` builds x64 for older Intel Macs. Since
@@ -41,8 +43,7 @@ it's unsigned, macOS Gatekeeper will require right-click → Open on first launc
 
 ## Privacy
 
-- Read-only. It never modifies your Claude Code config; the kill-list feature
-  only *generates* a snippet for you to paste.
+- Read-only. It never modifies your Claude Code config.
 - No network access, and it never spawns or executes your configured MCP
   servers. (The MCP↔CLI redundancy check runs `command -v`, a local `$PATH`
   lookup.)
@@ -50,6 +51,20 @@ it's unsigned, macOS Gatekeeper will require right-click → Open on first launc
   installed plugin manifests under `~/.claude/plugins/`, and session logs under
   `~/.claude/projects/**/*.jsonl`. Nothing leaves the process except what the
   UI renders.
+- The one exception is the "Connect" link described below — it's off by
+  default in the sense that nothing happens until you click it, and even then
+  it only opens a browser tab. It never uploads scan data.
+
+## Connect (optional)
+
+The dashboard's "Connect to find out" line opens
+[a GitHub Discussion](https://github.com/matjaz-go/token-diet-tool/discussions/new?category=ideas)
+in your default browser — nothing else. No scan data is sent, automatically
+or otherwise; the app has no server to send it to. It exists to gauge whether
+a real cross-team benchmark (e.g. "is 14k wasted tokens/session high for a
+5-person team?") is worth building, and to let people register interest if
+so. If that ships, it will be a separate, explicit opt-in — this tool's core
+scan stays local-only regardless.
 
 ## What it shows, and what it deliberately doesn't
 
@@ -63,7 +78,6 @@ actually derive:
 |---|---|---|
 | Dashboard | MCP servers configured, idle-server count, distinct tools actually called, context-token total for the window (from each session's `usage` block) | "Tools loaded" totals and used/loaded fractions — would require spawning each MCP server to introspect its schema (network + arbitrary code) |
 | Drill-down | Real tool names and call counts, parsed from `tool_use` blocks in session logs; `alwaysLoad` misconfiguration flag | Names of idle tools that were never called — unknowable without introspecting the server |
-| Kill list | Whole **servers** (the one config lever that exists: `disabledMcpjsonServers`) and a generated per-project snippet | Estimated token savings — replaced with an honest explanation of what disabling an idle server does and doesn't save |
 
 The handle's badge is the number of idle *servers* found on the last scan.
 
@@ -72,11 +86,11 @@ The handle's badge is the number of idle *servers* found on the last scan.
 An MCP server can be available in a Claude Code session in three ways, each
 with a different data quality:
 
-| Source | Read from | Idle detection | Kill-list lever |
-|---|---|---|---|
-| `project` | `.mcp.json` / `~/.claude.json` → `projects[<path>].mcpServers` | High confidence: configured and zero calls | Real: generates a `disabledMcpjsonServers` snippet |
-| `plugin` | `~/.claude/plugins/installed_plugins.json`, cross-referenced with each plugin's own bundled `.mcp.json` for its real server name(s) | High confidence: installed and zero calls | Flaggable, but no verified snippet — points to Claude Code's `/plugin` command |
-| `connector` | `~/.claude.json` → `claudeAiMcpEverConnected` (Slack, Gmail, Calendar, Drive, …) plus Chrome-extension flags | **Low confidence** — only knows "ever connected", never "currently connected", and only sees usage through Claude Code, not claude.ai web/mobile | Not eligible — managed at claude.ai → Settings → Connectors |
+| Source | Read from | Idle detection |
+|---|---|---|
+| `project` | `.mcp.json` / `~/.claude.json` → `projects[<path>].mcpServers` | High confidence: configured and zero calls |
+| `plugin` | `~/.claude/plugins/installed_plugins.json`, cross-referenced with each plugin's own bundled `.mcp.json` for its real server name(s) | High confidence: installed and zero calls |
+| `connector` | `~/.claude.json` → `claudeAiMcpEverConnected` (Slack, Gmail, Calendar, Drive, …) plus Chrome-extension flags | **Low confidence** — only knows "ever connected", never "currently connected", and only sees usage through Claude Code, not claude.ai web/mobile |
 
 Any `mcp__<x>__<y>` tool call matching none of these still appears
 (`source: 'unknown'`) rather than being dropped. Reading each plugin's own
@@ -85,7 +99,7 @@ register the same underlying MCP server.
 
 The connector blind spot is real: a connector used heavily from claude.ai's
 web or mobile app looks idle here. That's why connectors get
-`idleConfidence: 'low'` and are excluded from the kill list entirely.
+`idleConfidence: 'low'`.
 
 ## Findings
 
@@ -124,9 +138,10 @@ Electron + Vite (`electron-vite`) + React + TypeScript.
 - `src/main/index.ts` — main process. Frameless, transparent, always-on-top
   `BrowserWindow` that resizes between a small handle and the full panel via
   IPC (`window:set-expanded`), always re-docked to the right edge of the
-  primary display's work area. Also exposes `scan:run` and `scan:snippet`.
-- `src/main/realScan.ts` — orchestrates the scan and builds the
-  `disabledMcpjsonServers` snippet.
+  primary display's work area. Also exposes `scan:run` and `connect:open`
+  (opens a fixed GitHub Discussion URL via `shell.openExternal` — no argument
+  accepted from the renderer, and no other network access).
+- `src/main/realScan.ts` — orchestrates the scan.
 - `src/main/lib/` — `fsPaths.ts` (path/window helpers), `pricing.ts` (model
   price table), `sessionAnalytics.ts` (session-log parsing), `format.ts`,
   `checks.ts` (the six findings and the headline reduction).
@@ -134,15 +149,13 @@ Electron + Vite (`electron-vite`) + React + TypeScript.
   main and renderer.
 - `src/preload/index.ts` — exposes `window.toolDietBridge` via `contextBridge`.
 - `src/renderer/src/` — the React UI; `App.tsx` owns view state
-  (`idle | dashboard | drilldown | killlist`), the scan result and the
-  kill-list set; `components/` has one file per screen.
+  (`idle | dashboard | drilldown`) and the scan result; `components/` has one
+  file per screen.
 
 Typecheck with `npx tsc --noEmit`. There is no test suite yet.
 
 ## Known limitations / roadmap
 
-- Plugins get no real removal snippet, only a pointer to `/plugin`; the exact
-  non-interactive uninstall path needs confirming first.
 - The scan runs synchronously on the main thread. Fine on demand; move it
   off-thread before running it on a timer.
 - Session logs are read three times (tool calls, session summaries, repeated

@@ -17,21 +17,15 @@ export interface RealTool {
 
 // Three genuinely different data qualities, not one:
 // - 'project'   classic .mcp.json / ~/.claude.json project config. Full real
-//               idle detection, and a real local disable lever
-//               (disabledMcpjsonServers).
+//               idle detection (configured & zero calls).
 // - 'plugin'    installed via ~/.claude/plugins/installed_plugins.json, with
 //               its MCP server name(s) read from that plugin's own bundled
-//               .mcp.json. Real idle detection (installed + call count), but
-//               no verified local disable snippet — management happens
-//               through Claude Code's own plugin system, not a config edit
-//               this app can safely generate.
+//               .mcp.json. Real idle detection (installed + call count).
 // - 'connector' claude.ai account-level connectors (Slack, Gmail, Google
 //               Calendar/Drive, Claude Docs, Chrome). Only "ever connected"
 //               is knowable locally (~/.claude.json's
-//               claudeAiMcpEverConnected) — not "currently connected" — and
-//               there's no local file that disables one; that's an
-//               account-settings action. Shown for visibility, never
-//               kill-list eligible.
+//               claudeAiMcpEverConnected) — not "currently connected". Shown
+//               for visibility; idleConfidence stays 'low' accordingly.
 export type ServerSource = 'project' | 'plugin' | 'connector' | 'unknown'
 
 export interface RealServer {
@@ -41,7 +35,6 @@ export interface RealServer {
   alwaysLoad: boolean
   idle: boolean
   idleConfidence: 'high' | 'low'
-  killListEligible: boolean
   totalCalls: number
   projectCount: number
   tools: RealTool[]
@@ -74,12 +67,17 @@ export interface PotentialReduction {
   totalTokens: number
   pct: number
   contributors: FindingId[]
+  // Real average across this window's own sessions — undefined only when
+  // sessionsThisWindow is 0 (nothing to divide by). Basis for the "connect
+  // to compare" CTA; never fabricated or benchmarked against anything.
+  avgPerSessionTokens?: number
 }
 
 export interface ScanResult {
   scannedAt: number
   sinceDays: number
   projectsScanned: number
+  sessionsThisWindow: number
   servers: RealServer[]
   tokensThisWindow: number
   weeklySpendUsd: number | null

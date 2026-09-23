@@ -6,7 +6,7 @@
 // Two halves:
 //  1. MCP server inventory — three genuinely different sources ('project',
 //     'plugin', 'connector'; see ServerSource in ../shared/types.ts) feeding
-//     the drill-down/kill-list flow.
+//     the drill-down view.
 //  2. Findings — cost, cache health, CLAUDE.md bloat, long sessions,
 //     repeated reads, MCP<->CLI redundancy — ported from tool-diet's own
 //     checks (src/main/lib/checks.ts), aggregated across every project
@@ -71,7 +71,7 @@ interface ConnectorRef {
 
 // "Ever connected" per ~/.claude.json, not "currently connected" — this app
 // has no way to tell those apart locally, which is why connectors get
-// idleConfidence: 'low' downstream and are never kill-list eligible.
+// idleConfidence: 'low' downstream.
 function loadConnectorServers(globalConfig: any): ConnectorRef[] {
   const everConnected: string[] = globalConfig?.claudeAiMcpEverConnected || []
   const out: ConnectorRef[] = everConnected.map((label) => {
@@ -149,7 +149,6 @@ interface Agg {
   label: string
   source: ServerSource
   alwaysLoad: boolean
-  killListEligible: boolean
   idleConfidence: 'high' | 'low'
   projects: Set<string>
   toolCalls: Map<string, number>
@@ -177,6 +176,7 @@ export function runScan(sinceDays = 7): ScanResult {
       scannedAt,
       sinceDays,
       projectsScanned: 0,
+      sessionsThisWindow: 0,
       servers: [],
       tokensThisWindow: 0,
       weeklySpendUsd: null,
@@ -194,7 +194,6 @@ export function runScan(sinceDays = 7): ScanResult {
       label: plugin.label,
       source: 'plugin',
       alwaysLoad: false,
-      killListEligible: true,
       idleConfidence: 'high'
     })
     if (plugin.projectPath) agg.projects.add(plugin.projectPath)
@@ -205,7 +204,6 @@ export function runScan(sinceDays = 7): ScanResult {
       label: connector.label,
       source: 'connector',
       alwaysLoad: false,
-      killListEligible: false,
       idleConfidence: 'low'
     })
   }
@@ -234,7 +232,6 @@ export function runScan(sinceDays = 7): ScanResult {
         label: name,
         source: 'project',
         alwaysLoad: false,
-        killListEligible: true,
         idleConfidence: 'high'
       })
       agg.projects.add(projectPath)
@@ -248,7 +245,6 @@ export function runScan(sinceDays = 7): ScanResult {
         label: server,
         source: 'unknown',
         alwaysLoad: false,
-        killListEligible: false,
         idleConfidence: 'low'
       })
       agg.projects.add(projectPath)
@@ -277,7 +273,6 @@ export function runScan(sinceDays = 7): ScanResult {
         alwaysLoad: agg.alwaysLoad,
         idle: totalCalls === 0,
         idleConfidence: agg.idleConfidence,
-        killListEligible: agg.killListEligible,
         totalCalls,
         projectCount: agg.projects.size,
         tools
@@ -297,12 +292,13 @@ export function runScan(sinceDays = 7): ScanResult {
     checkMcpCliRedundancy(projectServerNames)
   ].filter((f): f is NonNullable<typeof f> => f !== null)
 
-  const potentialReduction = computePotentialReduction(findings, tokensThisWindow)
+  const potentialReduction = computePotentialReduction(findings, tokensThisWindow, allSessionSummaries.length)
 
   return {
     scannedAt,
     sinceDays,
     projectsScanned,
+    sessionsThisWindow: allSessionSummaries.length,
     servers,
     tokensThisWindow,
     weeklySpendUsd: costResult?.totalUsd ?? null,
@@ -310,29 +306,4 @@ export function runScan(sinceDays = 7): ScanResult {
     findings,
     potentialReduction
   }
-}
-
-export function buildDisabledServersSnippet(
-  flaggedServerIds: string[]
-): Record<string, { disabledMcpjsonServers: string[] }> {
-  // Real config lever: ~/.claude.json -> projects[<path>].disabledMcpjsonServers.
-  // Only ever matches 'project'-source ids — plugin/connector ids never
-  // appear as a literal key in any project's .mcp.json, so passing one here
-  // is a safe no-op rather than a wrong snippet.
-  const globalConfig = readJsonSafe(path.join(os.homedir(), '.claude.json'))
-  const out: Record<string, { disabledMcpjsonServers: string[] }> = {}
-  if (!globalConfig?.projects) return out
-
-  for (const [projectPath, entryRaw] of Object.entries(globalConfig.projects)) {
-    const entry = entryRaw as any
-    const servers = loadProjectMcpConfig(projectPath, globalConfig)
-    const already: string[] = entry.disabledMcpjsonServers || []
-    const toDisable = flaggedServerIds.filter(
-      (id) => Object.prototype.hasOwnProperty.call(servers, id) && !already.includes(id)
-    )
-    if (toDisable.length > 0) {
-      out[projectPath] = { disabledMcpjsonServers: [...already, ...toDisable] }
-    }
-  }
-  return out
 }

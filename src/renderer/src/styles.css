@@ -89,8 +89,7 @@ input:focus-visible {
    flash an OS/webkit scrollbar on the scrollable regions for a frame or two.
    App.tsx toggles this class for the animation's duration only. */
 .app-shell.is-resizing .panel-body,
-.app-shell.is-resizing .tool-list,
-.app-shell.is-resizing .snippet {
+.app-shell.is-resizing .tool-list {
   overflow: hidden !important;
 }
 
@@ -241,7 +240,7 @@ input:focus-visible {
   /* Flex items default to min-height: auto, which stops them shrinking
      below their content's natural height — without this the body just
      grows to fit everything instead of staying constrained and scrolling
-     (same class of bug as .tool-list / .snippet). */
+     (same class of bug as .tool-list). */
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
@@ -571,73 +570,6 @@ input:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 
-.spacer {
-  flex: 1;
-}
-
-.primary-btn {
-  background: var(--blue-fill);
-  border: none;
-  color: #fff;
-  font-size: 14px;
-  font-weight: 600;
-  padding: 12px 16px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  transition:
-    filter 0.15s var(--ease),
-    transform 0.1s var(--ease),
-    opacity 0.15s var(--ease);
-}
-
-.primary-btn:hover:not(:disabled) {
-  filter: brightness(1.1);
-}
-
-.primary-btn:active:not(:disabled) {
-  transform: scale(0.98);
-}
-
-.primary-btn:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
-.primary-btn.secondary {
-  background: var(--blue-bg);
-  color: var(--blue-text);
-}
-
-.outline-btn {
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--text-primary);
-  font-size: 13px;
-  font-weight: 600;
-  padding: 12px 16px;
-  border-radius: 10px;
-  transition:
-    background 0.15s var(--ease),
-    transform 0.1s var(--ease),
-    opacity 0.15s var(--ease);
-}
-
-.outline-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.05);
-}
-
-.outline-btn:active:not(:disabled) {
-  transform: scale(0.98);
-}
-
-.outline-btn:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
 .link-btn {
   background: transparent;
   border: none;
@@ -756,67 +688,6 @@ input:focus-visible {
   color: var(--amber);
 }
 
-.footer-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding-top: 10px;
-  border-top: 1px solid var(--border);
-}
-
-.footer-row .primary-btn,
-.footer-row .outline-btn {
-  flex: 1;
-}
-
-.selected-count {
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-
-.chip-row {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--bg-card-2);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 5px 6px 5px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  animation: viewFade 0.15s var(--ease);
-}
-
-.chip-remove {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  border: none;
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--text-secondary);
-  font-size: 11px;
-  line-height: 1;
-  padding: 0;
-  transition:
-    background 0.15s var(--ease),
-    color 0.15s var(--ease);
-}
-
-.chip-remove:hover {
-  background: rgba(255, 255, 255, 0.18);
-  color: #fff;
-}
-
 .savings-card {
   background: rgba(74, 222, 128, 0.1);
   border: 1px solid rgba(74, 222, 128, 0.25);
@@ -852,61 +723,30 @@ input:focus-visible {
   font-size: 11px;
 }
 
-.snippet {
-  background: #101012;
-  border: 1px solid var(--border);
+.connect-card {
+  background: var(--blue-bg);
+  border: 1px solid rgba(143, 178, 255, 0.25);
   border-radius: 12px;
-  padding: 12px 14px;
-  font-family: 'SF Mono', ui-monospace, Menlo, monospace;
-  font-size: 12px;
-  line-height: 1.6;
-  color: #c9c9cf;
-  overflow-y: auto;
-  overflow-x: auto;
-  flex: 1;
-  min-height: 0;
-  white-space: pre;
+  padding: 12px 16px;
 }
 
-.snippet .key {
-  color: #7fb0ff;
+.connect-text {
+  font-size: 13px;
+  color: var(--blue-text);
+  margin: 0 0 4px;
+  line-height: 1.5;
 }
 
-.snippet .str {
-  color: #9adfb3;
+.connect-inline {
+  font-size: inherit;
+  font-weight: 700;
+  text-decoration: underline;
 }
 
-.button-row {
-  display: flex;
-  gap: 10px;
+.connect-note {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.5;
 }
 
-.button-row > * {
-  flex: 1;
-}
-
-@keyframes toastIn {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.toast {
-  position: absolute;
-  bottom: 78px;
-  left: 20px;
-  right: 20px;
-  background: #101012;
-  border: 1px solid var(--border);
-  color: var(--text-primary);
-  font-size: 12px;
-  text-align: center;
-  padding: 8px 10px;
-  border-radius: 8px;
-  animation: toastIn 0.18s var(--ease);
-}
